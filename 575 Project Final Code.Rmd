@@ -1,0 +1,934 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(tidyr)
+library(lubridate)
+library(magrittr)
+library(dplyr)   
+library(caret)
+library(ggplot2)
+#library(vip) 
+
+#Getting the DATA
+#speed_date <- read.csv("C:/Users/laura/Desktop/MSBA/IDS 575/Final Project/Speed Dating Data.csv/Speed Dating Data_2.csv")
+
+#speed_date<- read.csv("C:/Users/Nieto-PC/Dropbox/Grad School Docs/Fall 2020/IDS 575 Machine Learning/Project/Speed Dating Data.csv/Speed Dating Data.csv")
+#speed_date=Speed.Dating.Data
+# I. Data Exploration
+
+dim(speed_date)
+head(speed_date)
+#summary(speed_date, 10)
+
+#Find unique
+unique(speed_date$iid)
+#552 unique individuals
+
+unique(speed_date$id)
+#Up to 22 people per wave
+
+#The distribution of gender based on iid 
+unique(speed_date$idg)
+makesense =   select(speed_date, iid, gender, pid, match,id, wave)
+
+speed_date$dummymatch=speed_date$match
+
+iidDateCount =   select(speed_date,iid, date, gender)
+iidDateCount=distinct(iidDateCount, .keep_all=FALSE)
+hist(iidDateCount$date)
+
+hist(iidDateCount$gender)
+iidDateCount %>% group_by(gender) %>% tally() 
+
+
+iidDateCount =   select(speed_date,iid, date)
+iidDateCount=distinct(iidDateCount, .keep_all=FALSE)
+hist(iidDateCount$date)
+as.factor(speed_date$field)
+summary(speed_date$field)
+speed_date %>% group_by(iid) %>%  summarise(gender =mean(gender), unique(field), totmatch=sum(dummymatch))
+
+
+speed_date %>% group_by(field) %>%  summarise(totmatch=mean(dummymatch))
+
+ #II. Correlation and plots
+
+
+
+```
+
+```{r}
+#Data Manipulation 
+summary(speed_date$field_cd)
+
+
+#Missing values
+nm<-names(speed_date)[colMeans(is.na(speed_date))>0.6]
+speed_date <- speed_date %>% select(-nm)
+
+MissingValues= colMeans(is.na(speed_date))[colMeans(is.na(speed_date))>0]
+MissingValues
+
+#Remove variables not needed:
+speed_date <- speed_date %>% select(-c(shar1_2, attr4_2,sinc4_2,intel4_2,fun4_2,amb4_2    , shar4_2, attr2_2, sinc2_2,intel2_2,fun2_2,amb2_2,shar2_2,attr3_2 ,sinc3_2 ,intel3_2,fun3_2    ,amb3_2,attr5_2,sinc5_2,intel5_2 ,fun5_2,amb5_2,you_call,them_cal,date_3,attr1_3, sinc1_3 , intel1_3, fun1_3, amb1_3, shar1_3, attr3_3, sinc3_3 , intel3_3 ,fun3_3, amb3_3, career, field,undergra, tuition, match,income)) 
+
+#Convert to factor
+speed_date$from= tolower(speed_date$from) #convert to lower case
+
+
+#checking for more missing -  
+sd_missing <- unlist(lapply(speed_date, function(x) sum(is.na(x))))/nrow(speed_date)
+sort(sd_missing[sd_missing > 0], decreasing = TRUE)
+
+is.character(speed_date)
+
+
+#speed_date[is.na(speed_date)] = 0
+
+speed_date[c("id", "positin1", "pid", "int_corr", "age_o", "race_o", "pf_o_att", "pf_o_sin", "pf_o_int", "pf_o_fun", "pf_o_amb", "pf_o_sha", "attr_o", "sinc_o", "intel_o", "fun_o", "amb_o", "shar_o", "like_o", "prob_o", "met_o", "age", "field_cd", "race", "imprace", "imprelig",  "goal", "date", "go_out", "career_c", "sports", "tvsports", "exercise", "dining", "museums", "art", "hiking", "gaming", "clubbing", "reading", "tv", "theater", "movies", "concerts", "music", "shopping", "yoga", "exphappy", "attr1_1", "sinc1_1", "intel1_1", "fun1_1", "amb1_1", "shar1_1", "attr4_1", "sinc4_1", "intel4_1", "fun4_1", "amb4_1", "shar4_1", "attr2_1", "sinc2_1", "intel2_1", "fun2_1", "amb2_1", "shar2_1", "attr3_1", "sinc3_1", "fun3_1", "intel3_1", "amb3_1", "attr5_1", "sinc5_1", "intel5_1", "fun5_1", "amb5_1", "attr", "sinc", "intel", "fun", "amb", "shar", "like", "prob", "met", "match_es", "attr1_s", "sinc1_s", "intel1_s", "fun1_s", "amb1_s", "shar1_s", "attr3_s", "sinc3_s", "intel3_s", "fun3_s", "amb3_s", "satis_2", "length", "numdat_2", "attr1_2", "sinc1_2", "intel1_2", "fun1_2", "amb1_2")][is.na(speed_date[c("id", "positin1", "pid", "int_corr", "age_o", "race_o", "pf_o_att", "pf_o_sin", "pf_o_int", "pf_o_fun", "pf_o_amb", "pf_o_sha", "attr_o", "sinc_o", "intel_o", "fun_o", "amb_o", "shar_o", "like_o", "prob_o", "met_o", "age", "field_cd", "race", "imprace", "imprelig",  "goal", "date", "go_out", "career_c", "sports", "tvsports", "exercise", "dining", "museums", "art", "hiking", "gaming", "clubbing", "reading", "tv", "theater", "movies", "concerts", "music", "shopping", "yoga", "exphappy", "attr1_1", "sinc1_1", "intel1_1", "fun1_1", "amb1_1", "shar1_1", "attr4_1", "sinc4_1", "intel4_1", "fun4_1", "amb4_1", "shar4_1", "attr2_1", "sinc2_1", "intel2_1", "fun2_1", "amb2_1", "shar2_1", "attr3_1", "sinc3_1", "fun3_1", "intel3_1", "amb3_1", "attr5_1", "sinc5_1", "intel5_1", "fun5_1", "amb5_1", "attr", "sinc", "intel", "fun", "amb", "shar", "like", "prob", "met", "match_es", "attr1_s", "sinc1_s", "intel1_s", "fun1_s", "amb1_s", "shar1_s", "attr3_s", "sinc3_s", "intel3_s", "fun3_s", "amb3_s", "satis_2", "length", "numdat_2", "attr1_2", "sinc1_2", "intel1_2", "fun1_2", "amb1_2")])] <- 0
+
+#check if more missing values
+sd_missing2 <- unlist(lapply(speed_date, function(x) sum(is.na(x))))/nrow(speed_date)
+sort(sd_missing2[sd_missing2 > 0], decreasing = TRUE)
+#checking
+tail(speed_date, 10 )
+head(speed_date, 20)
+
+
+speed_date<- speed_date %>% replace_na(list(income2=0))
+summary(speed_date$income2)
+speed_date$income2[speed_date$income2 < 1] <- 0 #will represent na values where participant left value blank
+speed_date$income2[speed_date$income2 > 0 & speed_date$income2 < 31517] <- 1
+speed_date$income2[speed_date$income2 > 1 & speed_date$income2 < 44888] <- 2
+speed_date$income2[speed_date$income2 > 2 & speed_date$income2 < 54303] <- 3
+speed_date$income2[speed_date$income2 > 3 ] <- 4
+
+
+datafemale=speed_date[ speed_date$gender == 0, ]
+datamale=speed_date[ speed_date$gender == 1, ]
+summary(datafemale)
+
+wave5=speed_date[ speed_date$wave == 5, ]
+
+dim(speed_date)
+
+```
+
+#Random forest to find Relevant variables
+```{r}
+#Random Forest to find relevant variables
+
+
+#install.packages("ranger")
+library(randomForest)
+#install.packages("varImp")
+library(varImp)
+
+
+
+ImpVar_sd <- randomForest(dummymatch ~ . , data= speed_date, importance=TRUE) # fit the random forest with default parameter
+importance(ImpVar_sd)
+summary(ImpVar_sd)
+
+
+impvar_match = caret::varImp(ImpVar_sd,conditional=TRUE)
+
+# get variable importance, based on mean decrease in accuracy and conditional=True, adjusts for correlations between predictors
+
+varImpPlot(ImpVar_sd, sort=TRUE, 
+    n.var=min(30, if(is.null(dim(ImpVar_sd$importance)))
+      length(ImpVar_sd$importance) else nrow(ImpVar_sd$importance), 
+    class=NULL,main=deparse(substitute(ImpVar_sd)))) 
+
+#varimpAUC(ImpVar_sd) # I get an error saying it's not an s4 stuffmore robust towards class imbalance.
+```
+
+```{r}
+library(rpart)
+#DT model on male and female dataset
+
+#Splitting the dataset
+TRG_PCT=0.7
+nr=nrow(speed_date)
+speedIndex = sample(1:nr, size = round(TRG_PCT*nr), replace=FALSE)
+speedTrn=speed_date[speedIndex,]
+speedTst = speed_date[-speedIndex,]
+
+
+#Initial DT before removing variables and pruning
+speedDt = rpart(dummymatch ~ .,data=speedTrn,method="class", parms = list(split = "information"), control = rpart.control(cp=0))
+summary(speedDt)
+rpart.plot::prp(speedDt, type=1, box.palette = "RdYlGn", branch.lty = 3, shadow.col = "gray")
+
+summary(speedDt)
+
+printcp(speedDt)
+#Indentify where to prune to in terms of complexity and minspli by viewing plots and chart
+plotcp(speedDt)
+
+predTrn=predict(speedDt, speedTst, type='class')
+table(pred = predTrn, true=speedTst$dummymatch)
+#Accuracy for TRN 
+mean(predTrn==speedTst$dummymatch)
+
+
+#Decision Tree for speed dataset
+speedDt = rpart(dummymatch ~ .,data=subset(speedTrn, select = -c(zipcode,like,dec_o,dec, from, like_o)),method="class", parms = list(split = "information"), control = rpart.control(cp=0.012))
+
+summary(speedDt)
+
+rpart.plot::prp(speedDt, type=1, box.palette = "RdYlGn", branch.lty = 3, shadow.col = "gray")
+
+#Complexity chart for pruning
+printcp(speedDt)
+#Indentify where to prune to in terms of complexity and minspli by viewing plots and chart
+plotcp(speedDt)
+
+#Confusion Matrix
+predTrn=predict(speedDt, speedTst, type='class')
+table(pred = predTrn, true=speedTst$dummymatch)
+#Accuracy for TRN 
+mean(predTrn==speedTst$dummymatch)
+
+library(ROCR)
+
+score=predict(speedDt,speedTst, type="prob")[,2]
+pred=prediction(score, speedTst$dummymatch)
+
+#ROC Curver
+aucPerf <-performance(pred, "tpr", "fpr")
+plot(aucPerf)
+
+#AUC value
+aucPerf=performance(pred, "auc")
+aucPerf@y.values
+
+summary(speedDt)
+```
+
+
+```{r}
+#DT model on dataset containing only males
+
+#Splitting the dataset into test and train
+TRG_PCT=0.7
+nr=nrow(datamale)
+maleIndex = sample(1:nr, size = round(TRG_PCT*nr), replace=FALSE)
+maleTrn=datamale[maleIndex,]
+maleTst = datamale[-maleIndex,]
+
+summary(datamale)
+summary(maleTrn)
+
+
+#Male Decision Tree model
+maleDt = rpart(dummymatch ~ .,data=subset(maleTrn, select = -c(dec_o,dec, from, like_o,zipcode,like)),method="class", parms = list(split = "information"), control = rpart.control(cp=0.005))
+summary(maleDt)
+rpart.plot::prp(speedDt, type=1, box.palette = "RdYlGn", branch.lty = 3, shadow.col = "gray")
+
+#Complexity chart for pruning
+printcp(maleDt)
+#Indentify where to prune to in terms of complexity and minspli by viewing plots and chart
+plotcp(maleDt)
+
+#Confussion Matrix
+predTrn=predict(maleDt, maleTst, type='class')
+table(pred = predTrn, true=maleTst$dummymatch)
+#Accuracy for TRN 
+mean(predTrn==maleTst$dummymatch)
+
+library(ROCR)
+
+score=predict(maleDt,maleTst, type="prob")[,2]
+pred=prediction(score, maleTst$dummymatch)
+
+#ROC Curve
+aucPerf <-performance(pred, "tpr", "fpr")
+plot(aucPerf)
+
+#AUC value
+aucPerf=performance(pred, "auc")
+aucPerf@y.values
+```
+
+
+```{r}
+#DT model on dataset containing only females
+
+#Splitting the data 
+TRG_PCT=0.7
+nr=nrow(datafemale)
+femaleIndex = sample(1:nr, size = round(TRG_PCT*nr), replace=FALSE)
+femaleTrn=datafemale[femaleIndex,]
+femaleTst = datafemale[-femaleIndex,]
+
+
+#Female Decision Tree
+femaleDt = rpart(dummymatch ~ .,data=subset(femaleTrn, select = -c(dec_o,dec, from, like_o,zipcode,like)),method="class", parms = list(split = "information"), control = rpart.control(cp=0.0067))
+summary(femaleDt)
+rpart.plot::prp(maleDt, type=1, box.palette = "RdYlGn", branch.lty = 3, shadow.col = "gray")
+
+#Complexity chart for pruning
+printcp(femaleDt)
+#Indentify where to prune to in terms of complexity and minspli by viewing plots and chart
+plotcp(femaleDt)
+
+#Confussion Matrix
+predTrn=predict(femaleDt, femaleTst, type='class')
+table(pred = predTrn, true=femaleTst$dummymatch)
+#Accuracy for TRN 
+mean(predTrn==femaleTst$dummymatch)
+
+library(ROCR)
+
+score=predict(femaleDt,femaleTst, type="prob")[,2]
+pred=prediction(score, femaleTst$dummymatch)
+
+#ROC Curve
+aucPerf <-performance(pred, "tpr", "fpr")
+plot(aucPerf)
+
+#AUC value
+aucPerf=performance(pred, "auc")
+aucPerf@y.values
+```
+
+RANDOM FORESTS
+```{r}
+#Random Forest on male and female dataset
+#Running Libraries 
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(ranger)
+library('ROCR')
+library(ggplot2)
+library(caret)
+
+
+#RF model speed date
+rf_speed_date = ranger(dummymatch ~ ., data=subset(speedTrn, select = -c(zipcode,like,dec_o,dec, from, like_o)), num.trees =200 , probability = TRUE, importance = "permutation" )
+
+rf_speed_date
+
+perfROC_rf_speed_date0Tst=performance(prediction(predict(rf_speed_date,speedTst)$predictions[,2], speedTst$dummymatch),"tpr", "fpr" )
+
+
+plot(perfROC_rf_speed_date0Tst)
+
+importance(rf_speed_date)
+
+barplot(rf_speed_date$variable.importance, horiz = TRUE, las = 1)
+
+
+#Confusion Matrix
+predTst_rf=predict(rf_speed_date, speedTst,type="response")$predictions
+predTst_cat2<-predTst_rf[,2]
+head(predTst_cat2)
+predTst_thresh<-ifelse(predTst_cat2>0.51,1,0)
+
+table(pred = predTst_thresh, actual=speedTst$dummymatch)
+mean(predTst_thresh==speedTst$dummymatch)
+
+
+#AUC Value 
+rfAUC = performance(prediction(predict(rf_speed_date,speedTst)$predictions[,2], speedTst$dummymatch),"auc"  )
+rfAUC@y.values
+
+#Lift curve
+rflift = performance(prediction(predict(rf_speed_date,speedTst)$predictions[,2], speedTst$dummymatch),"lift", "rpp"  )
+plot(rflift)
+
+#Variable Importance
+imp_speed = data.frame(sort(importance(rf_speed_date), decreasing =  TRUE))
+imp_speed
+```
+
+```{r}
+#Random Forest on male dataset
+
+summary(maleTrn)
+
+#RF model male
+rfMale = ranger(dummymatch ~ ., data=subset(maleTrn, select = -c(zipcode,like,dec_o,dec, from, like_o)), num.trees =200 , probability = TRUE, importance = "permutation" )
+
+rfMale
+
+perfROCMale=performance(prediction(predict(rfMale,maleTst)$predictions[,2], maleTst$dummymatch),"tpr", "fpr" )
+
+
+plot(perfROCMale)
+
+importance(rfMale)
+
+barplot(rfMale$variable.importance, horiz = TRUE, las = 1)
+
+
+#Predictions
+pred_rfmale=predict(rfMale, maleTst)$predictions
+#pred_rfRangerModel
+
+
+
+mean(pred_rfmale==maleTst$dummymatch)
+#pred_rfRangerModel==lcdfTest$loan_status
+
+#confussion Matrix
+predTst_rf=predict(rfMale, maleTst,type="response")$predictions
+predTst_cat2<-predTst_rf[,2]
+head(predTst_cat2)
+predTst_thresh<-ifelse(predTst_cat2>0.51,1,0)
+table(pred = predTst_thresh, actual=maleTst$dummymatch)
+mean(predTst_thresh==maleTst$dummymatch)
+
+#AUC Value 
+rfAUC = performance(prediction(predict(rfMale,maleTst)$predictions[,2], maleTst$dummymatch),"auc"  )
+rfAUC@y.values
+
+#Lift curve
+rflift = performance(prediction(predict(rfMale,maleTst)$predictions[,2], maleTst$dummymatch),"lift", "rpp"  )
+plot(rflift)
+
+#Variable Importance
+imp_male = data.frame(sort(importance(rfMale), decreasing =  TRUE))
+imp_male
+
+```
+
+
+```{r}
+#Random Forest on female dataset
+
+summary(femaleTrn)
+
+#RF model female
+rfFemale = ranger(dummymatch ~ ., data=subset(femaleTrn, select = -c(zipcode,like,dec_o,dec, from, like_o)), num.trees =200 , probability = TRUE, importance = "permutation" )
+
+perfROCFemale=performance(prediction(predict(rfFemale,femaleTst)$predictions[,2], femaleTst$dummymatch),"tpr", "fpr" )
+
+
+plot(perfROCFemale)
+
+importance(rfFemale)
+
+barplot(rfFemale$variable.importance, horiz = TRUE, las = 1)
+
+
+#Finding the confusion Matrix
+pred_rfFemale=predict(rfFemale, femaleTst)$predictions
+
+predTst_rf=predict(rfFemale, femaleTst,type="response")$predictions
+predTst_cat2<-predTst_rf[,2]
+head(predTst_cat2)
+predTst_thresh<-ifelse(predTst_cat2>0.51,1,0)
+table(pred = predTst_thresh, actual=femaleTst$dummymatch)
+mean(predTst_thresh==femaleTst$dummymatch)
+
+#AUC Value 
+rfAUC = performance(prediction(predict(rfFemale,femaleTst)$predictions[,2], femaleTst$dummymatch),"auc"  )
+rfAUC@y.values
+
+#Lift curve
+rflift = performance(prediction(predict(rfFemale,femaleTst)$predictions[,2], femaleTst$dummymatch),"lift", "rpp"  )
+plot(rflift)
+
+#Variable Importance
+imp_female = data.frame(sort(importance(rfFemale), decreasing =  TRUE))
+imp_female
+
+```
+
+
+NAIVE-BAYES
+```{r}
+#Naive Bayes on the whole dataset
+
+library(e1071)
+library(reprex)
+#Operating NaiveBayes for Mal
+NB_speed <- naiveBayes(dummymatch ~ ., data = subset(speedTrn, select = -c(zipcode,like,dec_o,dec, from, like_o))) 
+summary(NB_speed)
+
+#Accuracy - we can actually get a confusion matrix
+nbpred <- as.data.frame(predict(NB_speed, newdata = speedTst,type='raw'))
+confusionMatrix(table(max.col(nbpred) - 1,speedTst$dummymatch)) #76.3% accuracy
+
+#GET AUC
+score=predict(NB_speed,speedTst, type="raw")[,2]
+pred=prediction(score, speedTst$dummymatch)
+
+
+aucPerf <-performance(pred, "tpr", "fpr")
+plot(aucPerf)
+
+#AUC value
+aucPerf=performance(pred, "auc")
+aucPerf@y.values #80.8
+```
+
+
+```{r}
+#Naive Bayes on MALE  dataset
+NB_male <- naiveBayes(dummymatch ~ .,data=subset(maleTrn, select = -c(dec_o,dec, from, like_o,zipcode)))
+summary(NB_male)
+
+
+#Pred and  Accuracy - we can actually get a confusion matrix
+Mnb_pred <- as.data.frame(predict(NB_male, newdata = maleTst,type='raw'))
+confusionMatrix(table(max.col(Mnb_pred) - 1,maleTst$dummymatch)) #accuracy - 75.5% 
+
+#AUC
+library(ROCR)
+
+score=predict(NB_male,maleTst, type="raw")[,2]
+pred=prediction(score, maleTst$dummymatch)
+
+aucPerf <-performance(pred, "tpr", "fpr")
+plot(aucPerf)
+
+#AUC value
+aucPerf=performance(pred, "auc")
+aucPerf@y.values #79.0
+```
+
+
+```{r}
+##Naive Bayes on FEMALE  dataset
+
+NB_female = naiveBayes(dummymatch ~ .,data=subset(femaleTrn, select = -c(dec_o,dec, from, like_o,zipcode)),method="class")
+summary(NB_female)
+
+
+#PRED Accuracy - we can actually get a confusion matrix
+Nb_predFe <- as.data.frame(predict(NB_female, newdata = femaleTst,type='raw'))
+confusionMatrix(table(max.col(Nb_predFe) - 1,femaleTst$dummymatch)) #accuracy - 74.8%
+
+#AUC
+library(ROCR)
+score=predict(NB_female,femaleTst, type="raw")[,2]
+pred=prediction(score, femaleTst$dummymatch)
+#plot auc
+aucPerf <-performance(pred, "tpr", "fpr")
+plot(aucPerf)
+#AUC value
+aucPerf=performance(pred, "auc")
+aucPerf@y.values #82.8
+
+
+```
+
+
+
+```{r GLM On All possible values }
+#logistic Regression 
+
+
+
+
+#table(speed_date$dummymatch)
+#we have less matches than actual matches
+#input_ones <- speed_date[which(speed_date$dummymatch == 1), ] 
+#input_zeros <- speed_date[which(speed_date$dummymatch == 0), ]
+
+#set.seed(100) 
+
+#input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))
+
+#input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))
+
+
+#training_ones <- input_ones[input_ones_training_rows, ]
+#training_zeros <- input_zeros[input_zeros_training_rows, ]
+#trainingData <- rbind(training_ones, training_zeros)
+
+#test_ones <- input_ones[-input_ones_training_rows, ]
+#test_zeros <- input_zeros[-input_zeros_training_rows, ]
+#testData <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's
+
+#table(testData$dummymatch)
+
+
+
+logReg = glm(dummymatch ~ iid + wave +position + pid + int_corr +samerace + field_cd +career_c + imprace +imprelig   + race  + goal + go_out + sports+  tvsports +exercise+ dining +museums+ art+ hiking+ gaming+ clubbing +reading+ tv+ theater+ movies+ concerts+ music+ shopping+ yoga + attr1_1 + sinc1_1+ intel1_1 + fun1_1 + amb1_1 +shar1_1 +attr+ sinc +intel +fun +amb +shar+met  ,  speedTrn, family=binomial(link="logit"))
+#We want to know what you look for in the opposite sex. 
+#SCORECARD results from the opposite sex 
+
+summary(logReg)
+
+library(InformationValue)
+
+
+
+predicted  = predict(logReg, speedTst, type="response")
+
+plotROC(speedTst$dummymatch, predicted)
+1-misClassError(speedTst$dummymatch, predicted)
+sensitivity(speedTst$dummymatch, predicted)
+specificity(speedTst$dummymatch, predicted)
+confusionMatrix(speedTst$dummymatch, predicted)
+
+
+logvarimp=varImp(logReg)
+###########################################
+#GLM Based on Hobbies
+logReg2 = glm(dummymatch ~  go_out + sports+  tvsports +exercise+ dining +museums+ art+ hiking+ gaming+ clubbing +reading+ tv+ theater+ movies+ concerts+ music+ shopping+ yoga ,  speedTrn, family=binomial(link="logit"))
+
+summary(logReg2)
+
+
+
+
+predicted2  = predict(logReg2, speedTst, type="response")
+
+plotROC(speedTst$dummymatch, predicted2)
+1-misClassError(speedTst$dummymatch, predicted2)
+sensitivity(speedTst$dummymatch, predicted2)
+specificity(speedTst$dummymatch, predicted2)
+confusionMatrix(speedTst$dummymatch, predicted2)
+logvarimp2=varImp(logReg2)
+###########################################
+#GLM Based on what you look for in the opposite sex
+logReg3 = glm(dummymatch ~  attr1_1 + sinc1_1+ intel1_1 + fun1_1 + amb1_1 +shar1_1 ,  speedTrn, family=binomial(link="logit"))
+
+summary(logReg3)
+
+
+
+
+predicted3  = predict(logReg3, speedTst, type="response")
+
+plotROC(speedTst$dummymatch, predicted3)
+1-misClassError(speedTst$dummymatch, predicted3)
+sensitivity(speedTst$dummymatch, predicted3)
+specificity(speedTst$dummymatch, predicted3)
+confusionMatrix(speedTst$dummymatch, predicted3)
+logvarimp3=varImp(logReg3)
+###########################################
+#GLM Based on Scorecard resuilts 
+logReg4 = glm(dummymatch ~  attr+ sinc +intel +fun +amb +shar+met ,  speedTrn, family=binomial(link="logit"))
+
+summary(logReg4)
+
+
+
+
+predicted4  = predict(logReg4, speedTst, type="response")
+
+plotROC(speedTst$dummymatch, predicted4)
+1-misClassError(speedTst$dummymatch, predicted4)
+sensitivity(speedTst$dummymatch, predicted4)
+specificity(speedTst$dummymatch, predicted4)
+confusionMatrix(speedTst$dummymatch, predicted4)
+
+logvarimp4=varImp(logReg4)
+```
+
+```{r GLM Female }
+#logistic Regression 
+
+#we have less matches than actual matches
+# input_ones <- datafemale[which(datafemale$dummymatch == 1), ] 
+# input_zeros <- datafemale[which(datafemale$dummymatch == 0), ]
+# 
+# set.seed(100) 
+# 
+# input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones)) 
+# 
+# input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))
+# 
+# 
+# training_ones <- input_ones[input_ones_training_rows, ]  
+# training_zeros <- input_zeros[input_zeros_training_rows, ]
+# trainingData <- rbind(training_ones, training_zeros) 
+# 
+# test_ones <- input_ones[-input_ones_training_rows, ]
+# test_zeros <- input_zeros[-input_zeros_training_rows, ]
+# testData <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's 
+
+
+
+
+logReg = glm(dummymatch ~ iid + wave +position + pid + int_corr +samerace + field_cd +career_c + imprace +imprelig   + race  + goal + go_out + sports+  tvsports +exercise+ dining +museums+ art+ hiking+ gaming+ clubbing +reading+ tv+ theater+ movies+ concerts+ music+ shopping+ yoga + attr1_1 + sinc1_1+ intel1_1 + fun1_1 + amb1_1 +shar1_1 +attr+ sinc +intel +fun +amb +shar+met  ,  femaleTrn, family=binomial(link="logit"))
+#We want to know what you look for in the opposite sex. 
+#SCORECARD results from the opposite sex 
+
+summary(logReg)
+
+library(InformationValue)
+
+
+
+predicted  = predict(logReg, femaleTst, type="response")
+
+plotROC(femaleTst$dummymatch, predicted)
+1-misClassError(femaleTst$dummymatch, predicted)
+sensitivity(femaleTst$dummymatch, predicted)
+specificity(femaleTst$dummymatch, predicted)
+confusionMatrix(femaleTst$dummymatch, predicted)
+logvarimp=varImp(logReg)
+
+###########################################
+#GLM Based on Hobbies
+logReg2 = glm(dummymatch ~  go_out + sports+  tvsports +exercise+ dining +museums+ art+ hiking+ gaming+ clubbing +reading+ tv+ theater+ movies+ concerts+ music+ shopping+ yoga ,  femaleTrn, family=binomial(link="logit"))
+
+summary(logReg2)
+
+
+
+
+predicted2  = predict(logReg2, femaleTst, type="response")
+
+plotROC(femaleTst$dummymatch, predicted2)
+1-misClassError(femaleTst$dummymatch, predicted2)
+sensitivity(femaleTst$dummymatch, predicted2)
+specificity(femaleTst$dummymatch, predicted2)
+confusionMatrix(femaleTst$dummymatch, predicted2)
+logvarimp2=varImp(logReg2)
+###########################################
+#GLM Based on what you look for in the opposite sex
+logReg3 = glm(dummymatch ~  attr1_1 + sinc1_1+ intel1_1 + fun1_1 + amb1_1 +shar1_1 ,  femaleTrn, family=binomial(link="logit"))
+
+summary(logReg3)
+
+
+
+
+predicted3  = predict(logReg3, femaleTst, type="response")
+
+plotROC(femaleTst$dummymatch, predicted3)
+1-misClassError(femaleTst$dummymatch, predicted3)
+sensitivity(femaleTst$dummymatch, predicted3)
+specificity(femaleTst$dummymatch, predicted3)
+confusionMatrix(femaleTst$dummymatch, predicted3)
+logvarimp3=varImp(logReg3)
+###########################################
+#GLM Based on Scorecard resuilts 
+logReg4 = glm(dummymatch ~  attr+ sinc +intel +fun +amb +shar+met ,  femaleTrn, family=binomial(link="logit"))
+
+summary(logReg4)
+
+
+
+
+predicted4  = predict(logReg4, femaleTst, type="response")
+
+plotROC(femaleTst$dummymatch, predicted4)
+1-misClassError(femaleTst$dummymatch, predicted4)
+sensitivity(femaleTst$dummymatch, predicted4)
+specificity(femaleTst$dummymatch, predicted4)
+confusionMatrix(femaleTst$dummymatch, predicted4)
+logvarimp4=varImp(logReg4)
+```
+
+
+
+
+```{r GLM Male }
+#logistic Regression 
+
+# #we have less matches than actual matches
+# input_ones <- datamale[which(datafemale$dummymatch == 1), ] 
+# input_zeros <- datamale[which(datafemale$dummymatch == 0), ]
+# 
+# set.seed(100) 
+# 
+# input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones)) 
+# 
+# input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))
+# 
+# 
+# training_ones <- input_ones[input_ones_training_rows, ]  
+# training_zeros <- input_zeros[input_zeros_training_rows, ]
+# trainingData <- rbind(training_ones, training_zeros) 
+# 
+# test_ones <- input_ones[-input_ones_training_rows, ]
+# test_zeros <- input_zeros[-input_zeros_training_rows, ]
+# maleTst <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's 
+
+
+
+
+logReg = glm(dummymatch ~ iid + wave +position + pid + int_corr +samerace + field_cd +career_c + imprace +imprelig   + race  + goal + go_out + sports+  tvsports +exercise+ dining +museums+ art+ hiking+ gaming+ clubbing +reading+ tv+ theater+ movies+ concerts+ music+ shopping+ yoga + attr1_1 + sinc1_1+ intel1_1 + fun1_1 + amb1_1 +shar1_1 +attr+ sinc +intel +fun +amb +shar+met  ,  maleTrn, family=binomial(link="logit"))
+#We want to know what you look for in the opposite sex. 
+#SCORECARD results from the opposite sex 
+
+summary(logReg)
+
+library(InformationValue)
+
+
+
+predicted  = predict(logReg, maleTst, type="response")
+
+plotROC(maleTst$dummymatch, predicted)
+1-misClassError(maleTst$dummymatch, predicted)
+sensitivity(maleTst$dummymatch, predicted)
+specificity(maleTst$dummymatch, predicted)
+confusionMatrix(maleTst$dummymatch, predicted)
+logvarimp=varImp(logReg)
+
+###########################################
+#GLM Based on Hobbies
+logReg2 = glm(dummymatch ~  go_out + sports+  tvsports +exercise+ dining +museums+ art+ hiking+ gaming+ clubbing +reading+ tv+ theater+ movies+ concerts+ music+ shopping+ yoga ,  maleTrn, family=binomial(link="logit"))
+
+summary(logReg2)
+
+
+
+
+predicted2  = predict(logReg2, maleTst, type="response")
+
+plotROC(maleTst$dummymatch, predicted2)
+1-misClassError(maleTst$dummymatch, predicted2)
+sensitivity(maleTst$dummymatch, predicted2)
+specificity(maleTst$dummymatch, predicted2)
+confusionMatrix(maleTst$dummymatch, predicted2)
+logvarimp2=varImp(logReg2)
+###########################################
+#GLM Based on what you look for in the opposite sex
+logReg3 = glm(dummymatch ~  attr1_1 + sinc1_1+ intel1_1 + fun1_1 + amb1_1 +shar1_1 ,  maleTrn, family=binomial(link="logit"))
+
+summary(logReg3)
+
+
+
+
+predicted3  = predict(logReg3, maleTst, type="response")
+
+plotROC(maleTst$dummymatch, predicted3)
+1-misClassError(maleTst$dummymatch, predicted3)
+sensitivity(maleTst$dummymatch, predicted3)
+specificity(maleTst$dummymatch, predicted3)
+confusionMatrix(maleTst$dummymatch, predicted3)
+logvarimp3=varImp(logReg3)
+###########################################
+#GLM Based on Scorecard resuilts 
+logReg4 = glm(dummymatch ~  attr+ sinc +intel +fun +amb +shar+met ,  maleTrn, family=binomial(link="logit"))
+
+summary(logReg4)
+
+
+
+
+predicted4  = predict(logReg4, maleTst, type="response")
+
+plotROC(maleTst$dummymatch, predicted4)
+1-misClassError(maleTst$dummymatch, predicted4)
+sensitivity(maleTst$dummymatch, predicted4)
+specificity(maleTst$dummymatch, predicted4)
+confusionMatrix(maleTst$dummymatch, predicted4)
+logvarimp4=varImp(logReg4)
+```
+
+
+
+
+```{r}
+speed_date$dummymatch=as.factor(speed_date$dummymatch)
+
+subset_speedTrn <- speed_date %>% select(dummymatch,iid , wave ,position , pid , int_corr ,samerace , field_cd ,career_c , imprace ,imprelig   , race  , goal , go_out , sports,  tvsports ,exercise, dining ,museums, art, hiking, gaming, clubbing,reading, tv, theater, movies, concerts, music, shopping, yoga , attr1_1 , sinc1_1, intel1_1 , fun1_1 , amb1_1 ,shar1_1 ,attr, sinc ,intel ,fun ,amb ,shar,met)
+
+
+                                       
+# lrfit=train(dummymatch ~ ., data=subset_speedTrn,trControl=trainControl("none"), method="glm", family="binomial")
+# 
+# class.res=predict(lrfit,subset_speedTrn[,-1]) 
+# speedTrn$dummymatch=as.numeric(speedTrn$dummymatch)
+# confusionMatrix(subset_speedTrn[,1],class.res)$overall[1]
+```
+
+```{r}
+library(glmnet)
+#Ridge Model
+X = model.matrix(dummymatch ~ .,data=subset_speedTrn )[, -1]
+y= subset_speedTrn$dummymatch
+y = as.numeric(y)
+
+#Initial Model glmnet model
+fit_ridge = glmnet(X, y, alpha = 0,family = "binomial")
+plot(fit_ridge)
+plot(fit_ridge, xvar = "lambda", label = TRUE)
+
+#Coefficients 
+coef(fit_ridge_cv, s = "lambda.1se")
+
+#Coefficients squared
+sum(coef(fit_ridge_cv, s = "lambda.1se")[-1] ^ 2)
+
+#MSE for glmnet
+mean(((y - predict(fit_ridge, X)) ^ 2))
+
+
+#CV MODEL
+fit_ridge_cv = cv.glmnet(X, y, alpha = 0,family = "binomial")
+plot(fit_ridge_cv)
+coef(fit_ridge_cv)
+
+#CV coefficients
+coef(fit_ridge_cv, s = "lambda.min")
+sum(coef(fit_ridge_cv, s = "lambda.min")[-1] ^ 2)
+coef(fit_ridge_cv, s = "lambda.1se")
+sum(coef(fit_ridge_cv, s = "lambda.1se")[-1] ^ 2)
+
+#Predictions
+predict(fit_ridge_cv, X, s = "lambda.min")
+pred <- predict(fit_ridge_cv, X)
+
+#MSE for cv 
+mean(((y - predict(fit_ridge_cv, X,s = "lambda.1se")) ^ 2))
+mean(((y - predict(fit_ridge_optimal, X,s = "lambda.min")) ^ 2))
+
+#Optimal Lambda Model
+optimal_lambda <- fit_ridge_cv$lambda.min
+optimal_lambda
+fit_ridge_optimal = glmnet(X, y, alpha = 0,family = "binomial", lambda = optimal_lambda)
+mean(((y - predict(fit_ridge_optimal, X)) ^ 2))
+
+summary(predict(fit_ridge_cv, X, s = "lambda.min"))
+
+```
+```{r}
+#Lasso Model
+#Initial Model glmnet model
+fit_lasso = glmnet(X, factor(y), alpha = 1,family = "binomial")
+plot(fit_lasso)
+plot(fit_lasso, xvar = "lambda", label = TRUE)
+
+#MSE
+mean((y - predict(fit_lasso, X)) ^ 2)
+
+#CV Model
+fit_lasso_cv = cv.glmnet(X, y, alpha = 1,family = "binomial")
+plot(fit_lasso_cv)
+
+#Coeffcients
+coef(fit_lasso_cv,s = "lambda.1se")
+coef(fit_lasso_cv, s = "lambda.min")
+
+#Sum of Coefficients squared
+sum(coef(fit_lasso_cv, s = "lambda.min")[-1] ^ 2)
+sum(coef(fit_lasso_cv, s = "lambda.1se")[-1] ^ 2)
+
+
+#MSE Values
+mean((y - predict(fit_lasso_cv, X,s = "lambda.1se")) ^ 2)
+mean((y - predict(fit_lasso_cv, X,s = "lambda.min")) ^ 2) 
+```
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
